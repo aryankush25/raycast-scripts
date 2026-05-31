@@ -1,4 +1,13 @@
-import { Action, ActionPanel, Color, Icon, Image, List, Toast, showToast } from "@raycast/api";
+import {
+  Action,
+  ActionPanel,
+  Color,
+  Icon,
+  Image,
+  List,
+  Toast,
+  showToast,
+} from "@raycast/api";
 import { execSync } from "child_process";
 import { existsSync } from "fs";
 import { useEffect, useState } from "react";
@@ -11,21 +20,27 @@ interface Browser {
 }
 
 const DEFAULT_BROWSER_BIN =
-  ["/opt/homebrew/bin/defaultbrowser", "/usr/local/bin/defaultbrowser"].find((p) => existsSync(p)) ??
-  "defaultbrowser";
+  ["/opt/homebrew/bin/defaultbrowser", "/usr/local/bin/defaultbrowser"].find(
+    (p) => existsSync(p),
+  ) ?? "defaultbrowser";
 
 function getDisplayName(appPath: string): string | null {
   const plist = `${appPath}/Contents/Info.plist`;
   if (!existsSync(plist)) return null;
   for (const key of ["CFBundleDisplayName", "CFBundleName"]) {
     try {
-      const val = execSync(`/usr/libexec/PlistBuddy -c "Print :${key}" "${plist}"`, {
-        encoding: "utf-8",
-        timeout: 2000,
-        stdio: ["ignore", "pipe", "ignore"],
-      }).trim();
+      const val = execSync(
+        `/usr/libexec/PlistBuddy -c "Print :${key}" "${plist}"`,
+        {
+          encoding: "utf-8",
+          timeout: 2000,
+          stdio: ["ignore", "pipe", "ignore"],
+        },
+      ).trim();
       if (val) return val;
-    } catch {}
+    } catch {
+      // key not present in plist — try next
+    }
   }
   return null;
 }
@@ -55,9 +70,14 @@ function findBrowserApp(id: string): { name: string; path: string } | null {
         paths.find((p) => /^\/Applications\/[^/]+\.app$/.test(p)) ?? paths[0];
 
       if (appPath) {
-        return { name: getDisplayName(appPath) ?? capitalize(id), path: appPath };
+        return {
+          name: getDisplayName(appPath) ?? capitalize(id),
+          path: appPath,
+        };
       }
-    } catch {}
+    } catch {
+      // mdfind failed or timed out — try next query
+    }
   }
 
   return null;
@@ -111,7 +131,9 @@ export default function BrowserList() {
     try {
       setBrowsers(loadBrowsers());
     } catch {
-      setError("'defaultbrowser' not found. Install it: brew install defaultbrowser");
+      setError(
+        "'defaultbrowser' not found. Install it: brew install defaultbrowser",
+      );
     } finally {
       setIsLoading(false);
     }
@@ -128,14 +150,18 @@ export default function BrowserList() {
       try {
         execSync(
           `osascript -e 'tell application "System Events" to tell process "CoreServicesUIAgent" to click button 1 of window 1'`,
-          { timeout: 2000 }
+          { timeout: 2000 },
         );
       } catch {
         // Dialog may not appear on all macOS versions
       }
       toast.style = Toast.Style.Success;
       toast.title = `${browser.name} is now your default browser`;
-      setBrowsers((prev) => sortedBrowsers(prev.map((b) => ({ ...b, isDefault: b.id === browser.id }))));
+      setBrowsers((prev) =>
+        sortedBrowsers(
+          prev.map((b) => ({ ...b, isDefault: b.id === browser.id })),
+        ),
+      );
     } catch {
       toast.style = Toast.Style.Failure;
       toast.title = `Failed to set ${browser.name} as default`;
@@ -145,7 +171,11 @@ export default function BrowserList() {
   if (error) {
     return (
       <List>
-        <List.EmptyView icon={Icon.ExclamationMark} title="Missing dependency" description={error} />
+        <List.EmptyView
+          icon={Icon.ExclamationMark}
+          title="Missing dependency"
+          description={error}
+        />
       </List>
     );
   }
@@ -157,7 +187,11 @@ export default function BrowserList() {
           key={browser.id}
           title={browser.name}
           icon={browserIcon(browser)}
-          accessories={browser.isDefault ? [{ tag: { value: "Default", color: Color.Green } }] : []}
+          accessories={
+            browser.isDefault
+              ? [{ tag: { value: "Default", color: Color.Green } }]
+              : []
+          }
           actions={
             <ActionPanel>
               <Action
