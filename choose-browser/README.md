@@ -34,12 +34,13 @@ npm install
 
 ```bash
 npm run dev
-# or: ray develop
 ```
 
 This compiles the extension and registers it with Raycast in development mode. Open Raycast and search for **"Choose Default Browser"** — it will appear under the **Development** section.
 
 The dev server watches for file changes and hot-reloads automatically. Errors and logs appear in the terminal.
+
+> **Note:** The `ray` CLI is bundled locally in `node_modules/.bin` and is only available through `npm run` scripts, not as a standalone terminal command.
 
 ### 3. Lint
 
@@ -56,7 +57,6 @@ Produces a production bundle in `dist/`:
 
 ```bash
 npm run build
-# or: ray build
 ```
 
 ---
