@@ -11,7 +11,7 @@ interface Browser {
 }
 
 const DEFAULT_BROWSER_BIN =
-  ["/opt/homebrew/bin/defaultbrowser", "/usr/local/bin/defaultbrowser"].find(existsSync) ??
+  ["/opt/homebrew/bin/defaultbrowser", "/usr/local/bin/defaultbrowser"].find((p) => existsSync(p)) ??
   "defaultbrowser";
 
 function getDisplayName(appPath: string): string | null {
@@ -19,10 +19,10 @@ function getDisplayName(appPath: string): string | null {
   if (!existsSync(plist)) return null;
   for (const key of ["CFBundleDisplayName", "CFBundleName"]) {
     try {
-      const val = execSync(`/usr/libexec/PlistBuddy -c "Print :${key}" "${plist}" 2>/dev/null`, {
+      const val = execSync(`/usr/libexec/PlistBuddy -c "Print :${key}" "${plist}"`, {
         encoding: "utf-8",
-        shell: true,
         timeout: 2000,
+        stdio: ["ignore", "pipe", "ignore"],
       }).trim();
       if (val) return val;
     } catch {}
@@ -40,10 +40,10 @@ function findBrowserApp(id: string): { name: string; path: string } | null {
 
   for (const query of queries) {
     try {
-      const result = execSync(`mdfind "${query}" -onlyin /Applications 2>/dev/null`, {
+      const result = execSync(`mdfind "${query}" -onlyin /Applications`, {
         encoding: "utf-8",
-        shell: true,
         timeout: 3000,
+        stdio: ["ignore", "pipe", "ignore"],
       }).trim();
 
       const paths = result
