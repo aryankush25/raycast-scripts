@@ -4,8 +4,8 @@ A collection of [Raycast](https://raycast.com) script commands for managing brow
 
 ## Scripts
 
-### 🌐 Choose Default Browser (`choose-browser.sh`)
-Lists all browsers installed on your system and lets you pick one to set as the default. Uses `defaultbrowser` to detect installed browsers and shows a native macOS picker.
+### 🌐 Choose Default Browser (`choose-browser/`)
+A full Raycast Extension with a native multi-step UI. Shows all installed browsers in a searchable list (current default is highlighted), then navigates to a detail/confirmation view before applying the change. Uses `defaultbrowser` to detect installed browsers and set the default.
 
 ### 🔀 Toggle Browser (`toggle-browser.sh`)
 Toggles the default browser between Firefox and Vivaldi with a single keystroke. Auto-dismisses the system confirmation dialog.
@@ -25,6 +25,11 @@ Firefox is supported as a source only (reading via `sqlite3`). Writing to Firefo
 
 ## Installation
 
-1. Clone or download this repo.
-2. In Raycast, open **Extensions → Script Commands → Add Script Directory** and point it at this folder.
-3. The scripts will appear in Raycast search immediately.
+### Script Commands (`toggle-browser.sh`, `sync-bookmarks.js`)
+1. In Raycast, open **Extensions → Script Commands → Add Script Directory** and point it at this repo root.
+2. The scripts will appear in Raycast search immediately.
+
+### Choose Default Browser Extension (`choose-browser/`)
+1. `cd choose-browser && npm install`
+2. Run `npm run dev` to load the extension in Raycast for development.
+3. Add an `extension-icon.png` (512×512) to `choose-browser/assets/` before running `npm run build`.
