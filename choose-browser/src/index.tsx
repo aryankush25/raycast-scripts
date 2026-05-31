@@ -10,47 +10,61 @@ interface Browser {
   appPath: string | null;
 }
 
-const BROWSER_NAMES: Record<string, string> = {
-  safari: "Safari",
-  chrome: "Google Chrome",
-  firefox: "Firefox",
-  vivaldi: "Vivaldi",
-  brave: "Brave Browser",
-  opera: "Opera",
-  edge: "Microsoft Edge",
-  arc: "Arc",
-  zen: "Zen Browser",
-  chromium: "Chromium",
-  waterfox: "Waterfox",
-  orion: "Orion",
-};
-
-const BROWSER_APP_PATHS: Record<string, string[]> = {
-  safari: ["/Applications/Safari.app"],
-  chrome: ["/Applications/Google Chrome.app"],
-  firefox: ["/Applications/Firefox.app"],
-  vivaldi: ["/Applications/Vivaldi.app"],
-  brave: ["/Applications/Brave Browser.app"],
-  opera: ["/Applications/Opera.app"],
-  edge: ["/Applications/Microsoft Edge.app"],
-  arc: ["/Applications/Arc.app"],
-  zen: ["/Applications/Zen Browser.app", "/Applications/Zen.app"],
-  chromium: ["/Applications/Chromium.app"],
-  waterfox: ["/Applications/Waterfox.app"],
-  orion: ["/Applications/Orion.app"],
-};
-
 const DEFAULT_BROWSER_BIN =
-  ["/opt/homebrew/bin/defaultbrowser", "/usr/local/bin/defaultbrowser"].find((p) =>
-    existsSync(p)
-  ) ?? "defaultbrowser";
+  ["/opt/homebrew/bin/defaultbrowser", "/usr/local/bin/defaultbrowser"].find(existsSync) ??
+  "defaultbrowser";
 
-function formatName(id: string): string {
-  return BROWSER_NAMES[id] ?? id.charAt(0).toUpperCase() + id.slice(1);
+function getDisplayName(appPath: string): string | null {
+  const plist = `${appPath}/Contents/Info.plist`;
+  if (!existsSync(plist)) return null;
+  for (const key of ["CFBundleDisplayName", "CFBundleName"]) {
+    try {
+      const val = execSync(`/usr/libexec/PlistBuddy -c "Print :${key}" "${plist}" 2>/dev/null`, {
+        encoding: "utf-8",
+        shell: true,
+        timeout: 2000,
+      }).trim();
+      if (val) return val;
+    } catch {}
+  }
+  return null;
 }
 
-function findAppPath(id: string): string | null {
-  return BROWSER_APP_PATHS[id]?.find((p) => existsSync(p)) ?? null;
+function findBrowserApp(id: string): { name: string; path: string } | null {
+  // Try matching bundle ID first (e.g. "firefox" matches org.mozilla.firefox),
+  // then fall back to display name (e.g. "arc" matches Arc.app whose bundle ID has no "arc").
+  const queries = [
+    `kMDItemCFBundleIdentifier == '*${id}*'c`,
+    `kMDItemDisplayName == '*${id}*'c && kMDItemContentType == 'com.apple.application-bundle'`,
+  ];
+
+  for (const query of queries) {
+    try {
+      const result = execSync(`mdfind "${query}" -onlyin /Applications 2>/dev/null`, {
+        encoding: "utf-8",
+        shell: true,
+        timeout: 3000,
+      }).trim();
+
+      const paths = result
+        .split("\n")
+        .filter((p) => p.endsWith(".app") && existsSync(p));
+
+      // Prefer a top-level /Applications/*.app over nested paths
+      const appPath =
+        paths.find((p) => /^\/Applications\/[^/]+\.app$/.test(p)) ?? paths[0];
+
+      if (appPath) {
+        return { name: getDisplayName(appPath) ?? capitalize(id), path: appPath };
+      }
+    } catch {}
+  }
+
+  return null;
+}
+
+function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 function browserIcon(browser: Browser): Image.ImageLike {
@@ -67,12 +81,25 @@ function loadBrowsers(): Browser[] {
     .map((line) => {
       const isDefault = line.startsWith("*");
       const id = line.replace(/^\*?\s*/, "").trim();
-      return { id, name: formatName(id), isDefault, appPath: findAppPath(id) };
+      const appInfo = findBrowserApp(id);
+      return {
+        id,
+        name: appInfo?.name ?? capitalize(id),
+        isDefault,
+        appPath: appInfo?.path ?? null,
+      };
     })
     .sort((a, b) => {
       if (a.isDefault !== b.isDefault) return a.isDefault ? -1 : 1;
       return a.name.localeCompare(b.name);
     });
+}
+
+function sortedBrowsers(browsers: Browser[]): Browser[] {
+  return [...browsers].sort((a, b) => {
+    if (a.isDefault !== b.isDefault) return a.isDefault ? -1 : 1;
+    return a.name.localeCompare(b.name);
+  });
 }
 
 export default function BrowserList() {
@@ -92,7 +119,10 @@ export default function BrowserList() {
 
   async function setDefault(browser: Browser) {
     if (browser.isDefault) return;
-    const toast = await showToast({ style: Toast.Style.Animated, title: `Setting ${browser.name} as default…` });
+    const toast = await showToast({
+      style: Toast.Style.Animated,
+      title: `Setting ${browser.name} as default…`,
+    });
     try {
       execSync(`${DEFAULT_BROWSER_BIN} ${browser.id}`);
       try {
@@ -105,12 +135,7 @@ export default function BrowserList() {
       }
       toast.style = Toast.Style.Success;
       toast.title = `${browser.name} is now your default browser`;
-      setBrowsers((prev) =>
-        prev.map((b) => ({ ...b, isDefault: b.id === browser.id })).sort((a, b) => {
-          if (a.isDefault !== b.isDefault) return a.isDefault ? -1 : 1;
-          return a.name.localeCompare(b.name);
-        })
-      );
+      setBrowsers((prev) => sortedBrowsers(prev.map((b) => ({ ...b, isDefault: b.id === browser.id }))));
     } catch {
       toast.style = Toast.Style.Failure;
       toast.title = `Failed to set ${browser.name} as default`;
@@ -137,7 +162,11 @@ export default function BrowserList() {
             <ActionPanel>
               <Action
                 title={browser.isDefault ? "Already Default" : "Set as Default"}
-                icon={browser.isDefault ? { source: Icon.CheckCircle, tintColor: Color.Green } : browserIcon(browser)}
+                icon={
+                  browser.isDefault
+                    ? { source: Icon.CheckCircle, tintColor: Color.Green }
+                    : browserIcon(browser)
+                }
                 onAction={() => setDefault(browser)}
               />
             </ActionPanel>
